@@ -14,10 +14,10 @@ async def start(message: types.Message):
 
 @dp.message(Command("buy"))
 async def buy(message: types.Message):
-    prices = [LabeledPrice(label="Подарок", amount=9⭐)]
+    prices = [LabeledPrice(label="Подарок", amount=9)]
     await bot.send_invoice(
         chat_id=message.chat.id,
-        title="Подарки ⭐",
+        title="Покупка",
         description="Подарки⭐",
         payload="product1",
         provider_token="",

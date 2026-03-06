@@ -1,41 +1,45 @@
 import asyncio
-import json
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 TOKEN = "8450764497:AAESpLs3rP-BDtQnIIkqg6nhBdtPsDfvG-w"  # вставь сюда токен от BotFather
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# Загружаем подарки
-with open("gifts.json", "r", encoding="utf-8") as f:
-    gifts = json.load(f)
+# Список подарков прямо в коде
+GIFTS = {
+    "Мишка": {"price": 50, "link": "https://example.com/mishka.zip"},
+    "Тортик": {"price": 30, "link": "https://example.com/tortik.zip"},
+    "Игрушка": {"price": 40, "link": "https://example.com/igrushka.zip"},
+    "Конфеты": {"price": 20, "link": "https://example.com/konfety.zip"}
+}
 
-# Кнопки меню подарков
-def gifts_keyboard():
-    buttons = [KeyboardButton(gift) for gift in gifts.keys()]
-    keyboard = ReplyKeyboardMarkup(keyboard=[[b] for b in buttons], resize_keyboard=True)
-    return keyboard
-
+# Команда /start
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer(
-        "Привет! 🎁 Выбери подарок из меню ниже:",
-        reply_markup=gifts_keyboard()
-    )
+    reply = "Привет! ⭐ У нас есть подарки:\n\n"
+    for gift, info in GIFTS.items():
+        reply += f"{gift} — {info['price']} Stars\n"
+    reply += "\nВыбери подарок командой /buy_Название_подарка"
+    await message.answer(reply)
 
+# Команды для покупки
 @dp.message()
-async def buy_gift(message: types.Message):
-    gift_name = message.text
-    if gift_name in gifts:
-        # Симуляция покупки
-        await message.answer(f"Ты выбрал подарок: {gift_name} 🎉")
-        await message.answer(f"Вот твой подарок: {gifts[gift_name]}")
+async def buy(message: types.Message):
+    text = message.text
+    if text.startswith("/buy_"):
+        gift_name = text[5:]
+        if gift_name in GIFTS:
+            # Симуляция покупки за Stars
+            await message.answer(f"Вы купили {gift_name} за {GIFTS[gift_name]['price']} Stars! 🎉")
+            await message.answer(f"Вот ваш подарок: {GIFTS[gift_name]['link']}")
+        else:
+            await message.answer("Такого подарка нет. Проверь команду.")
     else:
-        await message.answer("Пожалуйста, выбери подарок из меню ниже:", reply_markup=gifts_keyboard())
+        await message.answer("Напиши /buy_Название_подарка, чтобы купить подарок.")
 
+# Запуск бота
 async def main():
     await dp.start_polling(bot)
 

@@ -10,15 +10,15 @@ dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer("Привет! Напиши /buy чтобы купить ⭐")
+    await message.answer("Привет! Напиши /buy чтобы купить подарки по дешовке⭐")
 
 @dp.message(Command("buy"))
 async def buy(message: types.Message):
-    prices = [LabeledPrice(label="Товар", amount=50)]
+    prices = [LabeledPrice(label="Подарок", amount=9⭐)]
     await bot.send_invoice(
         chat_id=message.chat.id,
-        title="Покупка",
-        description="Цифровой товар",
+        title="Подарки ⭐",
+        description="Подарки⭐",
         payload="product1",
         provider_token="",
         currency="XTR",

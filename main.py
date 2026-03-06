@@ -4,7 +4,7 @@ from aiogram.filters import Command
 
 TOKEN = "8450764497:AAESpLs3rP-BDtQnIIkqg6nhBdtPsDfvG-w"
 
-bot = Bot(8450764497:AAESpLs3rP-BDtQnIIkqg6nhBdtPsDfvG-w)
+bot = Bot(TOKEN)
 dp = Dispatcher()
 
 @dp.message(Command("start"))

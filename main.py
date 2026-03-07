@@ -15,12 +15,18 @@ ADMIN_ID = 5349252067  # твой Telegram ID
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# подарки
+# подарки с ключами для выбора
 gifts = {
-    "bear": {"name": "🧸 Мишка", "price": 15},
-    "giftbox": {"name": "🎁 Подарочная коробка", "price": 25},
-    "ring": {"name": "💍 Обручальное кольцо", "price": 100},
-    "diamond": {"name": "💎 Бриллиант", "price": 100},
+    "bear": {"name": "🧸 Мишка", "price": 7},
+    "giftbox": {"name": "🎁 Подарочная коробка", "price": 13},
+    "ring": {"name": "💍 Обручальное кольцо", "price": 30},
+    "diamond": {"name": "💎 Бриллиант", "price": 30},
+    "heart": {"name": "❤️ Сердце", "price": 7},
+    "flowers": {"name": "💐 Букет цветов", "price": 20},
+    "rose": {"name": "🌹 Роза", "price": 13},
+    "champagne": {"name": "🍾 Шампанское", "price": 20},
+    "cup": {"name": "🏆 Кубок", "price": 30},
+    "rocket": {"name": "🚀 Ракета", "price": 20},
 }
 
 sales = []

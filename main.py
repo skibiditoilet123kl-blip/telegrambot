@@ -82,7 +82,7 @@ async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
 
 
 # после успешной оплаты
-@dp.message()
+@dp.message(lambda message: message.successful_payment is not None)
 async def successful_payment(message: types.Message):
 
     if message.successful_payment:
@@ -109,7 +109,6 @@ async def successful_payment(message: types.Message):
 # админ панель
 @dp.message(Command(commands=["admin"]))
 async def admin(message: types.Message):
-
     if message.from_user.id != ADMIN_ID:
         return
 
@@ -118,11 +117,9 @@ async def admin(message: types.Message):
         "/sales — посмотреть продажи"
     )
 
-
 # список продаж
 @dp.message(Command(commands=["sales"]))
 async def sales_list(message: types.Message):
-
     if message.from_user.id != ADMIN_ID:
         return
 
@@ -131,13 +128,9 @@ async def sales_list(message: types.Message):
         return
 
     text = "📊 Продажи:\n\n"
-
     for s in sales:
         text += f"{s[0]} купил {s[1]} за {s[2]}⭐\n"
-
-    await message.answer(text)
-
-
+ await message.answer(text)
 async def main():
     await dp.start_polling(bot)
 

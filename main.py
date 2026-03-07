@@ -83,14 +83,9 @@ async def successful_payment(message: types.Message):
 
     if message.successful_payment:
 
-        gift_id = message.successful_payment.invoice_payload
-        name, price = gifts[gift_id]
-
         await message.answer(
-            f"🎉 Оплата прошла успешно!\n\n"
-            f"Вы получили подарок:\n{name}"
+            "❌ Ошибка оплаты.\nПопробуйте ещё раз."
         )
-
 
 async def main():
     await dp.start_polling(bot)

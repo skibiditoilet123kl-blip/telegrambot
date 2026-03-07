@@ -1,11 +1,10 @@
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, PreCheckoutQuery
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
 ADMIN_ID = 5349252067
-PAYMENT_PROVIDER_TOKEN = "ВАШ_PROVIDER_TOKEN"  # Telegram Payments
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
@@ -149,7 +148,7 @@ async def message_handler(message: types.Message):
             await message.answer("❌ Промокод недействителен или уже использован.")
             return
 
-    # --- Ввод @username и создание инвойса ---
+    # --- Ввод @username и фиксация подарка ---
     if user_id in user_states:
         state = user_states[user_id]
         if state.get("step") == "username":
@@ -157,20 +156,10 @@ async def message_handler(message: types.Message):
             gift_key = state["gift_key"]
             gift = gifts[gift_key]
 
-            price = gift['price'] * 100
-            prices = [LabeledPrice(label=gift['name'], amount=price)]
-
-            await bot.send_invoice(
-                chat_id=user_id,
-                title=gift['name'],
-                description=f"Подарок {gift['name']} для {state['receiver']}",
-                payload=f"{gift_key}:{state['receiver']}",
-                provider_token=PAYMENT_PROVIDER_TOKEN,
-                currency="USD",
-                prices=prices
-            )
-            await message.answer(f"💳 Пожалуйста, оплатите подарок {gift['name']} для {state['receiver']}")
-            state["step"] = "await_payment"
+            sales.append((user_id, gift['name'], state['receiver'], gift['price']))
+            await message.answer(f"🎉 Подарок {gift['name']} отправлен пользователю {state['receiver']}")
+            await bot.send_message(ADMIN_ID, f"💰 Новый подарок\nОт: {user_id}\nПодарок: {gift['name']}\nПолучатель: {state['receiver']}\nЦена: {gift['price']}⭐")
+            del user_states[user_id]
             return
 
     # --- АДМИН: создание подарков и промокодов ---
@@ -212,21 +201,6 @@ async def message_handler(message: types.Message):
             promo_codes[state["code"]]={"gift_key":state["gift_key"],"uses_left":uses}
             del admin_states[user_id]
             await message.answer(f"✅ Промокод {state['code']} для подарка {gifts[state['gift_key']]['name']} создан! Количество использований: {uses}")
-
-# --- PAYMENTS ---
-@dp.pre_checkout_query()
-async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
-    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
-
-@dp.message(lambda message: message.successful_payment is not None)
-async def successful_payment(message: types.Message):
-    payload = message.successful_payment.invoice_payload
-    gift_key, receiver = payload.split(":")
-    gift = gifts[gift_key]
-
-    sales.append((message.from_user.id, gift['name'], receiver, gift['price']))
-    await message.answer(f"🎉 Оплата прошла успешно! Подарок {gift['name']} отправлен пользователю {receiver}")
-    await bot.send_message(ADMIN_ID, f"💰 Новый подарок\nОт: {message.from_user.id}\nПодарок: {gift['name']}\nПолучатель: {receiver}\nЦена: {gift['price']}⭐")
 
 # --- ЗАПУСК ---
 async def main():

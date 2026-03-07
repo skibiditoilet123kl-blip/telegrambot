@@ -44,7 +44,7 @@ def gifts_keyboard():
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
-        "✅ Отлично! Теперь вы можете использовать бота.\n\nВыбери подарок:",
+        "✅ Отлично! Теперь \n\nвыбери подарок:",
         reply_markup=gifts_keyboard()
     )
 

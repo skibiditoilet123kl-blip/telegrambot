@@ -116,5 +116,12 @@ async def admin(message: types.Message):
 
 async def main():
     await dp.start_polling(bot)
+    @dp.message(Command("admin"))
+async def admin(message: types.Message):
+    print(message.from_user.id)  # выводим ID в консоль
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ У вас нет доступа к админке")
+        return
+    await message.answer("👑 Админ панель", reply_markup=admin_keyboard())
 
 asyncio.run(main())

@@ -1,7 +1,12 @@
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LabeledPrice,
+    PreCheckoutQuery
+)
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
 
@@ -22,14 +27,14 @@ gifts = {
     "rocket": ("🚀 Ракета", 50),
 }
 
-# клавиатура подарков
+# клавиатура
 def gifts_keyboard():
     buttons = []
     for key, value in gifts.items():
         name, price = value
         buttons.append(
             [InlineKeyboardButton(
-                text=f"{name} — {price} звёзд",
+                text=f"{name} — {price} ⭐",
                 callback_data=key
             )]
         )
@@ -44,17 +49,47 @@ async def start(message: types.Message):
     )
 
 
+# выбор подарка
 @dp.callback_query()
 async def gift_selected(callback: types.CallbackQuery):
 
-    key = callback.data
-    name, price = gifts[key]
+    gift_id = callback.data
+    name, price = gifts[gift_id]
 
-    await callback.message.answer(
-        f"{name}\n{name} за {price} звёзд ⭐"
+    prices = [LabeledPrice(label=name, amount=price)]
+
+    await bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title=name,
+        description=f"{name} за {price} звёзд",
+        payload=gift_id,
+        provider_token="",  # для Stars оставляем пустым
+        currency="XTR",
+        prices=prices
     )
 
     await callback.answer()
+
+
+# проверка перед оплатой
+@dp.pre_checkout_query()
+async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+# после успешной оплаты
+@dp.message()
+async def successful_payment(message: types.Message):
+
+    if message.successful_payment:
+
+        gift_id = message.successful_payment.invoice_payload
+        name, price = gifts[gift_id]
+
+        await message.answer(
+            f"🎉 Оплата прошла успешно!\n\n"
+            f"Вы получили подарок:\n{name}"
+        )
 
 
 async def main():

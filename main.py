@@ -107,7 +107,7 @@ async def successful_payment(message: types.Message):
 
 
 # админ панель
-@dp.message(Command("admin"))
+@dp.message(Command(commands=["admin"]))
 async def admin(message: types.Message):
 
     if message.from_user.id != ADMIN_ID:
@@ -120,7 +120,7 @@ async def admin(message: types.Message):
 
 
 # список продаж
-@dp.message(Command("sales"))
+@dp.message(Command(commands=["sales"]))
 async def sales_list(message: types.Message):
 
     if message.from_user.id != ADMIN_ID:

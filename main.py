@@ -9,7 +9,7 @@ from aiogram.types import (
 )
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID = 5349252067  # вставь свой telegram id
+ADMIN_ID = 5349252067  # вставь свой Telegram ID
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
@@ -45,7 +45,7 @@ def gifts_keyboard():
 
 
 # старт
-@dp.message(Command("start"))
+@dp.message(Command(commands=["start"]))
 async def start(message: types.Message):
     await message.answer(
         "✅ Отлично! Теперь вы можете использовать бота.\n\nВыбери подарок:",
@@ -56,7 +56,6 @@ async def start(message: types.Message):
 # выбор подарка
 @dp.callback_query()
 async def gift_selected(callback: types.CallbackQuery):
-
     gift_id = callback.data
     name, price = gifts[gift_id]
 
@@ -67,7 +66,7 @@ async def gift_selected(callback: types.CallbackQuery):
         title=name,
         description=f"{name} за {price} звёзд",
         payload=gift_id,
-        provider_token="",
+        provider_token="",  # вставь свой токен платежного провайдера
         currency="XTR",
         prices=prices
     )
@@ -84,26 +83,23 @@ async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
 # после успешной оплаты
 @dp.message(lambda message: message.successful_payment is not None)
 async def successful_payment(message: types.Message):
+    gift_id = message.successful_payment.invoice_payload
+    name, price = gifts[gift_id]
 
-    if message.successful_payment:
+    sales.append((message.from_user.id, name, price))
 
-        gift_id = message.successful_payment.invoice_payload
-        name, price = gifts[gift_id]
+    await message.answer(
+        f"🎉 Оплата прошла успешно!\n\n"
+        f"Вы получили подарок:\n{name}"
+    )
 
-        sales.append((message.from_user.id, name, price))
-
-        await message.answer(
-            f"🎉 Оплата прошла успешно!\n\n"
-            f"Вы получили подарок:\n{name}"
-        )
-
-        await bot.send_message(
-            ADMIN_ID,
-            f"💰 Новая покупка\n\n"
-            f"Пользователь: {message.from_user.id}\n"
-            f"Подарок: {name}\n"
-            f"Цена: {price}⭐"
-        )
+    await bot.send_message(
+        ADMIN_ID,
+        f"💰 Новая покупка\n\n"
+        f"Пользователь: {message.from_user.id}\n"
+        f"Подарок: {name}\n"
+        f"Цена: {price}⭐"
+    )
 
 
 # админ панель
@@ -116,6 +112,7 @@ async def admin(message: types.Message):
         "👑 Админ панель\n\n"
         "/sales — посмотреть продажи"
     )
+
 
 # список продаж
 @dp.message(Command(commands=["sales"]))
@@ -130,7 +127,10 @@ async def sales_list(message: types.Message):
     text = "📊 Продажи:\n\n"
     for s in sales:
         text += f"{s[0]} купил {s[1]} за {s[2]}⭐\n"
- await message.answer(text)
+
+    await message.answer(text)
+
+
 async def main():
     await dp.start_polling(bot)
 

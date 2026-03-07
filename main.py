@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID = 5349252067
+ADMIN_ID = 5349252067  # Ваш Telegram ID
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
@@ -25,8 +25,8 @@ gifts = {
 
 sales = []  # (отправитель, подарок, получатель, цена)
 promo_codes = {}  # {"PROMO": {"gift_key": str, "uses_left": int}}
-user_states = {}  # состояния пользователей
-admin_states = {}  # состояния админа
+user_states = {}
+admin_states = {}
 
 # --- КЛАВИАТУРЫ ---
 def start_keyboard():
@@ -91,7 +91,7 @@ async def callback_handler(callback: types.CallbackQuery):
         await callback.answer()
         return
 
-    # --- Админка ---
+    # --- АДМИНКА ---
     if user_id == ADMIN_ID:
         state = admin_states.get(user_id, {})
         if data == "view_sales":
@@ -124,7 +124,7 @@ async def callback_handler(callback: types.CallbackQuery):
                 await callback.message.answer(text)
         await callback.answer()
 
-# --- СООБЩЕНИЯ ---
+# --- MESSAGE ---
 @dp.message.register()
 async def message_handler(message: types.Message):
     user_id = message.from_user.id
@@ -148,14 +148,13 @@ async def message_handler(message: types.Message):
             await message.answer("❌ Промокод недействителен или уже использован.")
             return
 
-    # --- Ввод @username и фиксация подарка ---
+    # --- Ввод @username для подарка ---
     if user_id in user_states:
         state = user_states[user_id]
         if state.get("step") == "username":
             state["receiver"] = text
             gift_key = state["gift_key"]
             gift = gifts[gift_key]
-
             sales.append((user_id, gift['name'], state['receiver'], gift['price']))
             await message.answer(f"🎉 Подарок {gift['name']} отправлен пользователю {state['receiver']}")
             await bot.send_message(ADMIN_ID, f"💰 Новый подарок\nОт: {user_id}\nПодарок: {gift['name']}\nПолучатель: {state['receiver']}\nЦена: {gift['price']}⭐")
@@ -202,7 +201,7 @@ async def message_handler(message: types.Message):
             del admin_states[user_id]
             await message.answer(f"✅ Промокод {state['code']} для подарка {gifts[state['gift_key']]['name']} создан! Количество использований: {uses}")
 
-# --- ЗАПУСК ---
+# --- RUN ---
 async def main():
     await dp.start_polling(bot)
 

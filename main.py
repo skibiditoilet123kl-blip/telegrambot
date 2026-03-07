@@ -10,25 +10,28 @@ from aiogram.types import (
 )
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID = 5349252067  # вставь свой Telegram ID
+ADMIN_ID = 5349252067  # твой Telegram ID
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# подарки с кодами
+# подарки
 gifts = {
-    "bear": {"name": "🧸 Мишка", "price": 15, "code": "BEAR2026"},
-    "giftbox": {"name": "🎁 Подарочная коробка", "price": 25, "code": "GIFTBOX2026"},
-    "ring": {"name": "💍 Обручальное кольцо", "price": 100, "code": "RING2026"},
-    "diamond": {"name": "💎 Бриллиант", "price": 100, "code": "DIAMOND2026"},
+    "bear": {"name": "🧸 Мишка", "price": 15},
+    "giftbox": {"name": "🎁 Подарочная коробка", "price": 25},
+    "ring": {"name": "💍 Обручальное кольцо", "price": 100},
+    "diamond": {"name": "💎 Бриллиант", "price": 100},
 }
 
 sales = []
-promo_codes = {}  # словарь промокодов: код → ключ подарка
 
-admin_states = {}  # состояние админа для добавления подарков/промо
+# промокоды
+promo_codes = {}  # promo_code -> gift_key
 
-# Клавиатура стартового меню
+# состояния админа для добавления подарков или промокодов
+admin_states = {}
+
+# стартовое меню
 def start_keyboard():
     buttons = [
         [InlineKeyboardButton(text="🎁 Подарки", callback_data="show_gifts")],
@@ -36,81 +39,77 @@ def start_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# Клавиатура подарков
+# клавиатура подарков
 def gifts_keyboard():
     buttons = []
     for key, value in gifts.items():
-        name, price = value["name"], value["price"]
-        buttons.append([InlineKeyboardButton(text=f"{name} — {price} ⭐", callback_data=key)])
+        buttons.append([InlineKeyboardButton(text=f"{value['name']} — {value['price']} ⭐", callback_data=key)])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-
-# старт
+# /start
 @dp.message(Command(commands=["start"]))
 async def start(message: types.Message):
     await message.answer("Выберите действие:", reply_markup=start_keyboard())
 
-
-# обработка кнопок стартового меню и подарков
+# обработка кнопок
 @dp.callback_query()
 async def callback_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    # показать подарки
     if callback.data == "show_gifts":
         await callback.message.answer("Выберите подарок:", reply_markup=gifts_keyboard())
         await callback.answer()
         return
-    elif callback.data == "promo_code":
+
+    # использовать промокод
+    if callback.data == "promo_code":
         await callback.message.answer("Введите промокод:")
         await callback.answer()
         return
 
-    # обработка выбора подарка для оплаты
+    # выбор подарка для оплаты
     if callback.data in gifts:
-        gift_id = callback.data
-        gift = gifts[gift_id]
+        gift = gifts[callback.data]
         prices = [LabeledPrice(label=gift["name"], amount=gift["price"])]
         await bot.send_invoice(
-            chat_id=callback.from_user.id,
+            chat_id=user_id,
             title=gift["name"],
-            description=f"{gift['name']} за {gift['price']} звёзд",
-            payload=gift_id,
-            provider_token="",  # вставь свой токен платежного провайдера
+            description=f"{gift['name']} за {gift['price']}⭐",
+            payload=callback.data,
+            provider_token="",  # вставь токен
             currency="XTR",
             prices=prices
         )
         await callback.answer()
         return
 
-    # админские кнопки
-    if callback.from_user.id == ADMIN_ID:
-        state = admin_states.get(callback.from_user.id, {})
+    # админка кнопки
+    if user_id == ADMIN_ID:
         if callback.data == "view_sales":
             if not sales:
                 await callback.message.answer("Продаж пока нет")
             else:
-                text = "📊 Продажи:\n\n" + "\n".join(f"{s[0]} купил {s[1]} за {s[2]}⭐" for s in sales)
+                text = "📊 Продажи:\n" + "\n".join(f"{s[0]} купил {s[1]} за {s[2]}⭐" for s in sales)
                 await callback.message.answer(text)
         elif callback.data == "clear_sales":
             sales.clear()
             await callback.message.answer("✅ Список продаж очищен")
         elif callback.data == "gift_stats":
-            if not sales:
-                await callback.message.answer("Продаж пока нет")
-            else:
-                stats = {}
-                for _, name, _ in sales:
-                    stats[name] = stats.get(name, 0) + 1
-                text = "📈 Статистика подарков:\n\n" + "\n".join(f"{k}: {v} шт." for k, v in stats.items())
-                await callback.message.answer(text)
+            stats = {}
+            for _, name, _ in sales:
+                stats[name] = stats.get(name, 0) + 1
+            text = "📈 Статистика подарков:\n" + "\n".join(f"{k}: {v} шт." for k, v in stats.items())
+            await callback.message.answer(text)
         elif callback.data == "add_gift":
-            admin_states[callback.from_user.id] = {"step": "name"}
+            admin_states[user_id] = {"step": "name"}
             await callback.message.answer("Введите название нового подарка:")
         elif callback.data == "add_promo":
-            admin_states[callback.from_user.id] = {"step": "promo_gift"}
-            await callback.message.answer("Введите ключ подарка для промокода:")
+            admin_states[user_id] = {"step": "gift_select_for_promo"}
+            await callback.message.answer("Введите ключ подарка для промокода (например bear, giftbox и т.д.):")
         await callback.answer()
 
-
-# админка
+# админка /admin
 @dp.message(Command(commands=["admin"]))
 async def admin(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -124,22 +123,20 @@ async def admin(message: types.Message):
     ])
     await message.answer("👑 Админ панель", reply_markup=keyboard)
 
-
-# обработка сообщений пользователей и админа (промокоды и добавление подарков)
+# обработка сообщений
 @dp.message()
 async def message_handler(message: types.Message):
     user_id = message.from_user.id
+    text = message.text.strip()
 
     # обработка промокодов пользователем
-    if message.text.strip().upper() in promo_codes:
-        key = promo_codes[message.text.strip().upper()]
-        gift = gifts[key]
+    if text.upper() in promo_codes:
+        gift_key = promo_codes[text.upper()]
+        gift = gifts[gift_key]
         sales.append((user_id, gift["name"], 0))
         await message.answer(f"🎉 Промокод принят! Вы получили подарок: {gift['name']}")
         await bot.send_message(ADMIN_ID, f"🎫 Промокод использован\nПользователь: {user_id}\nПодарок: {gift['name']}")
         return
-    elif message.text.startswith("/"):
-        return  # команды не обрабатываем здесь
 
     # обработка шагов админа
     if user_id in admin_states:
@@ -147,37 +144,34 @@ async def message_handler(message: types.Message):
         step = state.get("step")
 
         if step == "name":
-            state["name"] = message.text
+            state["name"] = text
             state["step"] = "price"
             await message.answer("Введите цену подарка (целое число):")
         elif step == "price":
-            if not message.text.isdigit():
+            if not text.isdigit():
                 await message.answer("Введите корректное число для цены:")
                 return
-            state["price"] = int(message.text)
-            state["step"] = "code"
+            state["price"] = int(text)
+            state["step"] = "gift_code"
             await message.answer("Введите код для подарка:")
-        elif step == "code":
-            state["code"] = message.text.strip().upper()
-            key = state["name"].lower().replace(" ", "_")
-            gifts[key] = {"name": state["name"], "price": state["price"], "code": state["code"]}
+        elif step == "gift_code":
+            state["key"] = text.lower().replace(" ", "_")
+            gifts[state["key"]] = {"name": state["name"], "price": state["price"]}
             del admin_states[user_id]
             await message.answer(f"✅ Подарок {state['name']} добавлен!")
 
-        elif step == "promo_gift":
-            gift_key = message.text.strip().lower().replace(" ", "_")
-            if gift_key not in gifts:
+        elif step == "gift_select_for_promo":
+            if text not in gifts:
                 await message.answer("Такого подарка нет. Введите ключ существующего подарка:")
                 return
-            state["gift_key"] = gift_key
+            state["gift_key"] = text
             state["step"] = "promo_code"
-            await message.answer("Введите промокод для этого подарка:")
+            await message.answer("Введите новый промокод для этого подарка:")
         elif step == "promo_code":
-            code = message.text.strip().upper()
+            code = text.upper()
             promo_codes[code] = state["gift_key"]
             del admin_states[user_id]
             await message.answer(f"✅ Промокод {code} для подарка {gifts[state['gift_key']]['name']} создан!")
-
 
 # платежи
 @dp.pre_checkout_query()
@@ -190,10 +184,9 @@ async def successful_payment(message: types.Message):
     gift = gifts[gift_id]
     sales.append((message.from_user.id, gift["name"], gift["price"]))
     await message.answer("❌ Ошибка оплаты, попробуйте ещё раз.")
-    await bot.send_message(ADMIN_ID,
-        f"💰 Новая покупка\nПользователь: {message.from_user.id}\nПодарок: {gift['name']}\nЦена: {gift['price']}⭐")
+    await bot.send_message(ADMIN_ID, f"💰 Новая покупка\nПользователь: {message.from_user.id}\nПодарок: {gift['name']}\nЦена: {gift['price']}⭐")
 
-
+# запуск
 async def main():
     await dp.start_polling(bot)
 

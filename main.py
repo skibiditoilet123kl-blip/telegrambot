@@ -54,11 +54,11 @@ def admin_keyboard():
 
 # --- СТАРТ ---
 @dp.message.register(Command("start"))
-async def start(message: types.Message):
+async def start_command(message: types.Message):
     await message.answer("Выберите действие:", reply_markup=start_keyboard())
 
 @dp.message.register(Command("admin"))
-async def admin(message: types.Message):
+async def admin_command(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     await message.answer("👑 Админ панель", reply_markup=admin_keyboard())

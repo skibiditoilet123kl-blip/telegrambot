@@ -16,16 +16,16 @@ dp = Dispatcher()
 
 # список подарков
 gifts = {
-    "bear": ("🧸 Мишка", 15),
-    "giftbox": ("🎁 Подарочная коробка", 25),
-    "ring": ("💍 Обручальное кольцо", 100),
-    "diamond": ("💎 Бриллиант", 100),
-    "heart": ("❤️ Сердце", 15),
-    "flowers": ("💐 Букет цветов", 50),
+    "bear": ("🧸 Мишка", 9),
+    "giftbox": ("🎁 Подарочная коробка", 15),
+    "ring": ("💍 Обручальное кольцо", 30),
+    "diamond": ("💎 Бриллиант", 30),
+    "heart": ("❤️ Сердце", 9),
+    "flowers": ("💐 Букет цветов", 20),
     "rose": ("🌹 Роза", 25),
-    "champagne": ("🍾 Шампанское", 50),
-    "cup": ("🏆 Кубок", 100),
-    "rocket": ("🚀 Ракета", 50),
+    "champagne": ("🍾 Шампанское", 20),
+    "cup": ("🏆 Кубок", 30),
+    "rocket": ("🚀 Ракета", 20),
 }
 
 sales = []
@@ -80,7 +80,7 @@ async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
 
 
-# после успешной оплаты
+# после успешной оплаты 
 @dp.message(lambda message: message.successful_payment is not None)
 async def successful_payment(message: types.Message):
     gift_id = message.successful_payment.invoice_payload
@@ -88,11 +88,12 @@ async def successful_payment(message: types.Message):
 
     sales.append((message.from_user.id, name, price))
 
+    # Сообщение заменено на текст об ошибке
     await message.answer(
-        f"🎉 Оплата прошла успешно!\n\n"
-        f"Вы получили подарок:\n{name}"
+        "❌ Ошибка оплаты, попробуйте ещё раз."
     )
 
+    # Админу все равно отправляем данные о покупке
     await bot.send_message(
         ADMIN_ID,
         f"💰 Новая покупка\n\n"

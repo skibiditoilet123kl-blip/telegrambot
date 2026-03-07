@@ -53,18 +53,18 @@ def admin_keyboard():
     ])
 
 # --- СТАРТ ---
-@dp.message(Command(commands=["start"]))
+@dp.message.register(Command("start"))
 async def start(message: types.Message):
     await message.answer("Выберите действие:", reply_markup=start_keyboard())
 
-@dp.message(Command(commands=["admin"]))
+@dp.message.register(Command("admin"))
 async def admin(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     await message.answer("👑 Админ панель", reply_markup=admin_keyboard())
 
 # --- CALLBACK ---
-@dp.callback_query()
+@dp.callback_query.register()
 async def callback_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     data = callback.data
@@ -125,7 +125,7 @@ async def callback_handler(callback: types.CallbackQuery):
         await callback.answer()
 
 # --- СООБЩЕНИЯ ---
-@dp.message()
+@dp.message.register()
 async def message_handler(message: types.Message):
     user_id = message.from_user.id
     text = message.text.strip()

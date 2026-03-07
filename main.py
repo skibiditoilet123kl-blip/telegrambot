@@ -1,75 +1,145 @@
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-import asyncio
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LabeledPrice,
+    PreCheckoutQuery
+)
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID = 5349252067
+ADMIN_ID = 5349252067  # вставь свой telegram id
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# ===== Подарки =====
+# список подарков
 gifts = {
-    "bear": "🧸 Мишка",
-    "giftbox": "🎁 Подарочная коробка",
-    "ring": "💍 Обручальное кольцо",
-    "diamond": "💎 Бриллиант",
+    "bear": ("🧸 Мишка", 15),
+    "giftbox": ("🎁 Подарочная коробка", 25),
+    "ring": ("💍 Обручальное кольцо", 100),
+    "diamond": ("💎 Бриллиант", 100),
+    "heart": ("❤️ Сердце", 15),
+    "flowers": ("💐 Букет цветов", 50),
+    "rose": ("🌹 Роза", 25),
+    "champagne": ("🍾 Шампанское", 50),
+    "cup": ("🏆 Кубок", 100),
+    "rocket": ("🚀 Ракета", 50),
 }
 
 sales = []
 
-# ===== Клавиатура подарков =====
+# клавиатура подарков
 def gifts_keyboard():
-    buttons = [[InlineKeyboardButton(text=name, callback_data=key)] for key, name in gifts.items()]
+    buttons = []
+    for key, value in gifts.items():
+        name, price = value
+        buttons.append(
+            [InlineKeyboardButton(
+                text=f"{name} — {price} ⭐",
+                callback_data=key
+            )]
+        )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# ===== Кнопочная админка =====
-def admin_keyboard():
-    buttons = [
-        [InlineKeyboardButton("📊 Посмотреть продажи", callback_data="view_sales")],
-        [InlineKeyboardButton("🔙 Назад", callback_data="back")]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# ===== /start =====
+# старт
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer("✅ Выбери подарок:", reply_markup=gifts_keyboard())
+    await message.answer(
+        "✅ Отлично! Теперь вы можете использовать бота.\n\nВыбери подарок:",
+        reply_markup=gifts_keyboard()
+    )
 
-# ===== /admin =====
+
+# выбор подарка
+@dp.callback_query()
+async def gift_selected(callback: types.CallbackQuery):
+
+    gift_id = callback.data
+    name, price = gifts[gift_id]
+
+    prices = [LabeledPrice(label=name, amount=price)]
+
+    await bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title=name,
+        description=f"{name} за {price} звёзд",
+        payload=gift_id,
+        provider_token="",
+        currency="XTR",
+        prices=prices
+    )
+
+    await callback.answer()
+
+
+# проверка перед оплатой
+@dp.pre_checkout_query()
+async def pre_checkout(pre_checkout_query: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+# после успешной оплаты
+@dp.message()
+async def successful_payment(message: types.Message):
+
+    if message.successful_payment:
+
+        gift_id = message.successful_payment.invoice_payload
+        name, price = gifts[gift_id]
+
+        sales.append((message.from_user.id, name, price))
+
+        await message.answer(
+            f"🎉 Оплата прошла успешно!\n\n"
+            f"Вы получили подарок:\n{name}"
+        )
+
+        await bot.send_message(
+            ADMIN_ID,
+            f"💰 Новая покупка\n\n"
+            f"Пользователь: {message.from_user.id}\n"
+            f"Подарок: {name}\n"
+            f"Цена: {price}⭐"
+        )
+
+
+# админ панель
 @dp.message(Command("admin"))
 async def admin(message: types.Message):
-    print(f"Admin command from user_id: {message.from_user.id}")  # проверка ID
+
     if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ У вас нет доступа к админке")
         return
-    await message.answer("👑 Админ панель", reply_markup=admin_keyboard())
 
-# ===== Callback =====
-@dp.callback_query()
-async def callback_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
+    await message.answer(
+        "👑 Админ панель\n\n"
+        "/sales — посмотреть продажи"
+    )
 
-    if callback.data in gifts:
-        await callback.message.answer(f"Вы выбрали {gifts[callback.data]}")
-        await callback.answer()
 
-    elif callback.data == "view_sales" and user_id == ADMIN_ID:
-        if not sales:
-            await callback.message.answer("Продаж пока нет")
-        else:
-            text = "📊 Продажи:\n" + "\n".join([f"{s[0]} купил {s[1]}" for s in sales])
-            await callback.message.answer(text)
-        await callback.answer()
+# список продаж
+@dp.message(Command("sales"))
+async def sales_list(message: types.Message):
 
-    elif callback.data == "back" and user_id == ADMIN_ID:
-        await callback.message.answer("Вы в админке", reply_markup=admin_keyboard())
-        await callback.answer()
+    if message.from_user.id != ADMIN_ID:
+        return
 
-# ===== Запуск =====
+    if not sales:
+        await message.answer("Продаж пока нет")
+        return
+
+    text = "📊 Продажи:\n\n"
+
+    for s in sales:
+        text += f"{s[0]} купил {s[1]} за {s[2]}⭐\n"
+
+    await message.answer(text)
+
+
 async def main():
-    print("Бот запущен...")
     await dp.start_polling(bot)
+
 
 asyncio.run(main())

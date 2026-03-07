@@ -1,46 +1,64 @@
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-TOKEN = "8450764497:AAESpLs3rP-BDtQnIIkqg6nhBdtPsDfvG-w"  # вставь сюда токен от BotFather
+TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# Список подарков прямо в коде
-GIFTS = {
-    "Мишка": {"price": 50, "link": "https://example.com/mishka.zip"},
-    "Тортик": {"price": 30, "link": "https://example.com/tortik.zip"},
-    "Игрушка": {"price": 40, "link": "https://example.com/igrushka.zip"},
-    "Конфеты": {"price": 20, "link": "https://example.com/konfety.zip"}
+# список подарков
+gifts = {
+    "bear": ("🧸 Мишка", 15),
+    "giftbox": ("🎁 Подарочная коробка", 25),
+    "ring": ("💍 Обручальное кольцо", 100),
+    "diamond": ("💎 Бриллиант", 100),
+    "heart": ("❤️ Сердце", 15),
+    "flowers": ("💐 Букет цветов", 50),
+    "rose": ("🌹 Роза", 25),
+    "champagne": ("🍾 Шампанское", 50),
+    "cup": ("🏆 Кубок", 100),
+    "rocket": ("🚀 Ракета", 50),
 }
 
-# Команда /start
+# клавиатура подарков
+def gifts_keyboard():
+    buttons = []
+    for key, value in gifts.items():
+        name, price = value
+        buttons.append(
+            [InlineKeyboardButton(
+                text=f"{name} — {price} звёзд",
+                callback_data=key
+            )]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    reply = "Привет! ⭐ У нас есть подарки:\n\n"
-    for gift, info in GIFTS.items():
-        reply += f"{gift} — {info['price']} Stars\n"
-    reply += "\nВыбери подарок командой /buy_Название_подарка"
-    await message.answer(reply)
+    await message.answer(
+        "✅ Отлично! Теперь вы можете использовать бота.\n\nВыбери подарок:",
+        reply_markup=gifts_keyboard()
+    )
 
-# Команды для покупки
-@dp.message()
-async def buy(message: types.Message):
-    text = message.text
-    if text.startswith("/buy_"):
-        gift_name = text[5:]
-        if gift_name in GIFTS:
-            # Симуляция покупки за Stars
-            await message.answer(f"Вы купили {gift_name} за {GIFTS[gift_name]['price']} Stars! 🎉")
-            await message.answer(f"Вот ваш подарок: {GIFTS[gift_name]['link']}")
-        else:
-            await message.answer("Такого подарка нет. Проверь команду.")
-    else:
-        await message.answer("Напиши /buy_Название_подарка, чтобы купить подарок.")
 
-# Запуск бота
+@dp.callback_query()
+async def gift_selected(callback: types.CallbackQuery):
+
+    key = callback.data
+    name, price = gifts[key]
+
+    await callback.message.answer(
+        f"{name}\n{name} за {price} звёзд ⭐"
+    )
+
+    await callback.answer()
+
+
 async def main():
     await dp.start_polling(bot)
+
 
 asyncio.run(main())

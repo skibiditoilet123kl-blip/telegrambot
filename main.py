@@ -1,4 +1,6 @@
 import asyncio
+import sqlite3
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
@@ -9,149 +11,282 @@ ADMIN_ID = 5349252067
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# данные
+# ---------------- DATABASE ----------------
+
+db = sqlite3.connect("gifts.db")
+cursor = db.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS promo(
+code TEXT PRIMARY KEY,
+gift TEXT,
+uses INTEGER
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sales(
+sender INTEGER,
+receiver TEXT,
+gift TEXT,
+price INTEGER
+)
+""")
+
+db.commit()
+
+# ---------------- GIFTS ----------------
+
 gifts = {
-    "bear": {"name": "🧸 Мишка", "price": 15},
-    "rose": {"name": "🌹 Роза", "price": 25},
-    "diamond": {"name": "💎 Бриллиант", "price": 100}
+"bear":("🧸 Мишка",15),
+"rose":("🌹 Роза",25),
+"flowers":("💐 Букет",50),
+"diamond":("💎 Бриллиант",100),
+"heart":("❤️ Сердце",15),
+"ring":("💍 Кольцо",100),
+"box":("🎁 Коробка",25),
+"champ":("🍾 Шампанское",50),
+"cup":("🏆 Кубок",100),
+"rocket":("🚀 Ракета",50)
 }
 
-promo_codes = {}
 user_state = {}
 
-# клавиатуры
+# ---------------- KEYBOARDS ----------------
+
 def start_kb():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎁 Подарки", callback_data="gifts")],
-        [InlineKeyboardButton(text="🎫 Промокод", callback_data="promo")]
-    ])
+ return InlineKeyboardMarkup(
+ inline_keyboard=[
+ [InlineKeyboardButton(text="🎁 Подарки",callback_data="gifts")],
+ [InlineKeyboardButton(text="🎫 Промокод",callback_data="promo")]
+ ])
 
 def gifts_kb():
-    kb = []
-    for key,g in gifts.items():
-        kb.append([InlineKeyboardButton(
-            text=f"{g['name']} — {g['price']}⭐",
-            callback_data=f"gift_{key}"
-        )])
-    kb.append([InlineKeyboardButton(text="⬅️ Назад",callback_data="back")])
-    return InlineKeyboardMarkup(inline_keyboard=kb)
 
-# старт
+ kb=[]
+
+ for key,data in gifts.items():
+  name,price=data
+
+  kb.append([
+   InlineKeyboardButton(
+   text=f"{name} — {price}⭐",
+   callback_data=f"gift_{key}")
+  ])
+
+ kb.append([
+ InlineKeyboardButton(text="⬅️ Назад",callback_data="back")
+ ])
+
+ return InlineKeyboardMarkup(inline_keyboard=kb)
+
+# ---------------- START ----------------
+
 @dp.message(Command("start"))
-async def start(message: Message):
-    await message.answer("Выберите действие",reply_markup=start_kb())
+async def start(msg:Message):
 
-# админ
+ await msg.answer(
+ "🎁 Добро пожаловать в магазин подарков",
+ reply_markup=start_kb()
+ )
+
+# ---------------- ADMIN ----------------
+
 @dp.message(Command("admin"))
-async def admin(message: Message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    await message.answer("Админка\n/createpromo\n/listpromo")
+async def admin(msg:Message):
 
-# кнопки
+ if msg.from_user.id!=ADMIN_ID:
+  return
+
+ await msg.answer(
+ "Админ команды:\n\n"
+ "/createpromo CODE gift uses\n"
+ "/promos\n"
+ "/sales"
+ )
+
+# ---------------- BUTTONS ----------------
+
 @dp.callback_query(F.data=="gifts")
-async def show_gifts(call: CallbackQuery):
-    await call.message.edit_text("Выберите подарок",reply_markup=gifts_kb())
+async def show_gifts(call:CallbackQuery):
+
+ await call.message.edit_text(
+ "Выберите подарок",
+ reply_markup=gifts_kb()
+ )
 
 @dp.callback_query(F.data=="back")
-async def back(call: CallbackQuery):
-    await call.message.edit_text("Выберите действие",reply_markup=start_kb())
+async def back(call:CallbackQuery):
+
+ await call.message.edit_text(
+ "Главное меню",
+ reply_markup=start_kb()
+ )
+
+# ---------------- SELECT GIFT ----------------
 
 @dp.callback_query(F.data.startswith("gift_"))
-async def select_gift(call: CallbackQuery):
-    gift = call.data.split("_")[1]
-    user_state[call.from_user.id]={"gift":gift}
-    await call.message.answer("Введите @username получателя")
+async def select_gift(call:CallbackQuery):
 
-# ввод username
+ gift=call.data.split("_")[1]
+
+ user_state[call.from_user.id]=gift
+
+ await call.message.answer(
+ "Введите @username получателя"
+ )
+
+# ---------------- MESSAGE ----------------
+
 @dp.message()
-async def process(message: Message):
-    uid=message.from_user.id
+async def messages(msg:Message):
 
-    if uid in user_state:
-        gift_key=user_state[uid]["gift"]
-        gift=gifts[gift_key]
+ uid=msg.from_user.id
+ text=msg.text
 
-        await message.answer(
-            f"🎁 Подарок {gift['name']} отправлен {message.text}"
-        )
+ # отправка подарка
 
-        await bot.send_message(
-            ADMIN_ID,
-            f"Новый подарок\n"
-            f"От: {uid}\n"
-            f"Кому: {message.text}\n"
-            f"Подарок: {gift['name']}"
-        )
+ if uid in user_state:
 
-        del user_state[uid]
-        return
+  gift=user_state[uid]
 
-    # промокод
-    code=message.text.upper()
-    if code in promo_codes:
-        gift=promo_codes[code]["gift"]
+  name,price=gifts[gift]
 
-        if promo_codes[code]["uses"]<=0:
-            await message.answer("❌ Промокод использован")
-            return
+  cursor.execute(
+  "INSERT INTO sales VALUES(?,?,?,?)",
+  (uid,text,name,price)
+  )
+  db.commit()
 
-        promo_codes[code]["uses"]-=1
+  await msg.answer(
+  f"🎁 Вы отправили {name} пользователю {text}"
+  )
 
-        await message.answer(
-            f"🎉 Промокод принят!\n"
-            f"Вы получили {gifts[gift]['name']}"
-        )
-        return
+  await bot.send_message(
+  ADMIN_ID,
+  f"💰 Новая покупка\n"
+  f"От: {uid}\n"
+  f"Кому: {text}\n"
+  f"Подарок: {name}\n"
+  f"Цена: {price}⭐"
+  )
 
-# создание промокода
+  del user_state[uid]
+  return
+
+ # проверка промокода
+
+ cursor.execute(
+ "SELECT * FROM promo WHERE code=?",
+ (text.upper(),)
+ )
+
+ promo=cursor.fetchone()
+
+ if promo:
+
+  code,gift,uses=promo
+
+  if uses<=0:
+   await msg.answer("❌ Промокод использован")
+   return
+
+  cursor.execute(
+  "UPDATE promo SET uses=? WHERE code=?",
+  (uses-1,code)
+  )
+  db.commit()
+
+  name,price=gifts[gift]
+
+  await msg.answer(
+  f"🎉 Промокод принят!\n"
+  f"Подарок: {name}"
+  )
+
+# ---------------- CREATE PROMO ----------------
+
 @dp.message(Command("createpromo"))
-async def create_promo(message: Message):
-    if message.from_user.id!=ADMIN_ID:
-        return
+async def createpromo(msg:Message):
 
-    args=message.text.split()
+ if msg.from_user.id!=ADMIN_ID:
+  return
 
-    if len(args)!=4:
-        await message.answer(
-            "/createpromo CODE gift uses\n"
-            "пример:\n"
-            "/createpromo FREE bear 5"
-        )
-        return
+ args=msg.text.split()
 
-    code=args[1].upper()
-    gift=args[2]
-    uses=int(args[3])
+ if len(args)!=4:
+  await msg.answer(
+  "Использование:\n"
+  "/createpromo CODE gift uses\n"
+  "пример:\n"
+  "/createpromo FREE bear 5"
+  )
+  return
 
-    if gift not in gifts:
-        await message.answer("Нет такого подарка")
-        return
+ code=args[1].upper()
+ gift=args[2]
+ uses=int(args[3])
 
-    promo_codes[code]={
-        "gift":gift,
-        "uses":uses
-    }
+ if gift not in gifts:
+  await msg.answer("Нет такого подарка")
+  return
 
-    await message.answer("Промокод создан")
+ cursor.execute(
+ "INSERT OR REPLACE INTO promo VALUES(?,?,?)",
+ (code,gift,uses)
+ )
 
-# список промокодов
-@dp.message(Command("listpromo"))
-async def listpromo(message: Message):
-    if message.from_user.id!=ADMIN_ID:
-        return
+ db.commit()
 
-    if not promo_codes:
-        await message.answer("Промокодов нет")
-        return
+ await msg.answer("✅ Промокод создан")
 
-    text="Промокоды:\n"
-    for code,data in promo_codes.items():
-        text+=f"{code} | {data['gift']} | {data['uses']}\n"
+# ---------------- LIST PROMO ----------------
 
-    await message.answer(text)
+@dp.message(Command("promos"))
+async def promos(msg:Message):
+
+ if msg.from_user.id!=ADMIN_ID:
+  return
+
+ cursor.execute("SELECT * FROM promo")
+ promos=cursor.fetchall()
+
+ if not promos:
+  await msg.answer("Промокодов нет")
+  return
+
+ text="🎫 Промокоды\n\n"
+
+ for p in promos:
+  text+=f"{p[0]} | {p[1]} | {p[2]}\n"
+
+ await msg.answer(text)
+
+# ---------------- SALES ----------------
+
+@dp.message(Command("sales"))
+async def sales(msg:Message):
+
+ if msg.from_user.id!=ADMIN_ID:
+  return
+
+ cursor.execute("SELECT * FROM sales")
+ data=cursor.fetchall()
+
+ if not data:
+  await msg.answer("Продаж нет")
+  return
+
+ text="💰 Продажи\n\n"
+
+ for s in data:
+  text+=f"{s[0]} -> {s[1]} | {s[2]} | {s[3]}⭐\n"
+
+ await msg.answer(text)
+
+# ---------------- RUN ----------------
 
 async def main():
-    await dp.start_polling(bot)
+ await dp.start_polling(bot)
 
 asyncio.run(main())

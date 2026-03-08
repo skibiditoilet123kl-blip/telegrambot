@@ -11,20 +11,20 @@ from aiogram.types import (
     PreCheckoutQuery
 )
 from aiogram.filters import Command
-from aiogram.fsm.state import State,StatesGroup
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 
-TOKEN="8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID=5349252067
+TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
+ADMIN_ID = 5349252067
 
-bot=Bot(TOKEN)
-dp=Dispatcher(storage=MemoryStorage())
+bot = Bot(TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
 
 # ---------------- DATABASE ----------------
 
-db=sqlite3.connect("shop.db")
-cursor=db.cursor()
+db = sqlite3.connect("shop.db")
+cursor = db.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS promo(
@@ -46,7 +46,7 @@ db.commit()
 
 # ---------------- GIFTS ----------------
 
-gifts={
+gifts = {
 "bear":("🧸 Мишка",15),
 "rose":("🌹 Роза",25),
 "flowers":("💐 Букет",50),
@@ -62,19 +62,19 @@ gifts={
 # ---------------- STATES ----------------
 
 class PromoCreate(StatesGroup):
-
-    code=State()
-    gift=State()
-    uses=State()
+    code = State()
+    gift = State()
+    uses = State()
 
 class PromoUse(StatesGroup):
+    code = State()
 
-    code=State()
+class SendGift(StatesGroup):
+    username = State()
 
 # ---------------- KEYBOARDS ----------------
 
 def main_menu():
-
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🎁 Подарки",callback_data="gifts")],
@@ -93,7 +93,7 @@ def gifts_menu():
         kb.append([
             InlineKeyboardButton(
                 text=f"{name} — {price}⭐",
-                callback_data=f"buy_{key}"
+                callback_data=f"send_{key}"
             )
         ])
 
@@ -116,6 +116,7 @@ def admin_menu():
         inline_keyboard=[
             [InlineKeyboardButton(text="🎫 Создать промокод",callback_data="create_promo")],
             [InlineKeyboardButton(text="📊 Продажи",callback_data="sales")],
+            [InlineKeyboardButton(text="💰 Прибыль",callback_data="profit")],
             [InlineKeyboardButton(text="⬅️ Назад",callback_data="back_main")]
         ]
     )
@@ -150,6 +151,44 @@ async def gifts_show(call:CallbackQuery):
         reply_markup=gifts_menu()
     )
 
+# ---------------- SEND GIFT ----------------
+
+@dp.callback_query(F.data.startswith("send_"))
+async def send_gift(call:CallbackQuery,state:FSMContext):
+
+    gift=call.data.split("_")[1]
+
+    await state.update_data(gift=gift)
+
+    await call.message.answer("Введите @username или ID пользователя")
+
+    await state.set_state(SendGift.username)
+
+# ---------------- GET USER ----------------
+
+@dp.message(SendGift.username)
+async def get_user(msg:Message,state:FSMContext):
+
+    data=await state.get_data()
+
+    gift=data["gift"]
+
+    name,price=gifts[gift]
+
+    prices=[LabeledPrice(label=name,amount=price)]
+
+    await bot.send_invoice(
+        chat_id=msg.from_user.id,
+        title=f"Подарок {name}",
+        description="Отправка подарка",
+        payload=gift,
+        provider_token="",
+        currency="XTR",
+        prices=prices
+    )
+
+    await state.clear()
+
 # ---------------- PROMO MENU ----------------
 
 @dp.callback_query(F.data=="promo_menu")
@@ -181,7 +220,8 @@ async def check_promo(msg:Message,state:FSMContext):
 
     if not promo:
 
-        await msg.answer("❌ Промокод не действителен")
+        await msg.answer("❌ Промокод недействителен")
+        await state.clear()
         return
 
     gift=promo[1]
@@ -189,7 +229,8 @@ async def check_promo(msg:Message,state:FSMContext):
 
     if uses<=0:
 
-        await msg.answer("❌ Промокод использован")
+        await msg.answer("❌ У промокода закончились использования")
+        await state.clear()
         return
 
     name,price=gifts[gift]
@@ -207,52 +248,20 @@ async def check_promo(msg:Message,state:FSMContext):
 
     await state.clear()
 
-# ---------------- BUY GIFT ----------------
-
-@dp.callback_query(F.data.startswith("buy_"))
-async def buy(call:CallbackQuery):
-
-    gift=call.data.split("_")[1]
-
-    name,price=gifts[gift]
-
-    prices=[LabeledPrice(label=name,amount=price)]
-
-    await bot.send_invoice(
-        chat_id=call.from_user.id,
-        title=name,
-        description="Покупка подарка",
-        payload=gift,
-        provider_token="",
-        currency="XTR",
-        prices=prices
-    )
-
-# ---------------- PRE CHECKOUT ----------------
+# ---------------- BUY ----------------
 
 @dp.pre_checkout_query()
 async def pre_checkout(pre_checkout_q:PreCheckoutQuery):
 
     await bot.answer_pre_checkout_query(pre_checkout_q.id,ok=True)
 
-# ---------------- PAYMENT SUCCESS ----------------
+# ---------------- PAYMENT RESULT ----------------
 
 @dp.message(F.successful_payment)
-async def success(msg:Message):
-
-    gift=msg.successful_payment.invoice_payload
-
-    name,price=gifts[gift]
-
-    cursor.execute(
-        "INSERT INTO sales VALUES(?,?,?)",
-        (msg.from_user.id,name,price)
-    )
-
-    db.commit()
+async def payment_result(msg:Message):
 
     await msg.answer(
-        f"🎉 Покупка успешна!\n{name}"
+        "❌ Ошибка при оплате попробуйте снова"
     )
 
 # ---------------- ADMIN ----------------
@@ -285,7 +294,7 @@ async def promo_code(msg:Message,state:FSMContext):
 
     await state.update_data(code=msg.text)
 
-    text="Выберите подарок\n\n"
+    text="Введите ID подарка:\n\n"
 
     for k,v in gifts.items():
         text+=f"{k} - {v[0]}\n"
@@ -339,12 +348,30 @@ async def sales(call:CallbackQuery):
         await call.message.answer("Продаж нет")
         return
 
-    text="💰 Продажи\n\n"
+    text="📊 Продажи\n\n"
 
     for s in data:
         text+=f"{s[0]} | {s[1]} | {s[2]}⭐\n"
 
     await call.message.answer(text)
+
+# ---------------- PROFIT ----------------
+
+@dp.callback_query(F.data=="profit")
+async def profit(call:CallbackQuery):
+
+    if call.from_user.id!=ADMIN_ID:
+        return
+
+    cursor.execute("SELECT SUM(price) FROM sales")
+    money=cursor.fetchone()[0]
+
+    if money is None:
+        money=0
+
+    await call.message.answer(
+        f"💰 Общая прибыль\n\n{money} ⭐"
+    )
 
 # ---------------- RUN ----------------
 

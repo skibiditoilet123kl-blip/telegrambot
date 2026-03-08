@@ -165,8 +165,17 @@ async def enter_promo(call: CallbackQuery, state: FSMContext):
 
 @dp.message(PromoUse.code)
 async def check_promo(msg: Message, state: FSMContext):
-    # Всегда одно сообщение
-    await msg.answer("❌ У промокода закончились использования")
+    code = msg.text.strip()
+    cursor.execute("SELECT uses FROM promo WHERE code=?", (code,))
+    promo = cursor.fetchone()
+
+    if not promo:
+        # Промокода нет
+        await msg.answer("❌ Такого промокода нет")
+    else:
+        # Код есть — сразу сообщаем, что использован
+        await msg.answer("❌ Промокод использован")
+
     await state.clear()
 
 # ---------------- BUY ----------------

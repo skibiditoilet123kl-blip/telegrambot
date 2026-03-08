@@ -46,16 +46,16 @@ db.commit()
 # ---------------- GIFTS ----------------
 
 gifts = {
-    "bear":("🧸 Мишка",15),
-    "rose":("🌹 Роза",25),
-    "flowers":("💐 Букет",50),
-    "diamond":("💎 Бриллиант",100),
-    "heart":("❤️ Сердце",15),
-    "ring":("💍 Кольцо",100),
-    "box":("🎁 Коробка",25),
-    "champ":("🍾 Шампанское",50),
-    "cup":("🏆 Кубок",100),
-    "rocket":("🚀 Ракета",50)
+    "bear":("🧸 Мишка",6),
+    "rose":("🌹 Роза",9),
+    "flowers":("💐 Букет",20),
+    "diamond":("💎 Бриллиант",30),
+    "heart":("❤️ Сердце",6),
+    "ring":("💍 Кольцо",30),
+    "box":("🎁 Коробка",9),
+    "champ":("🍾 Шампанское",20),
+    "cup":("🏆 Кубок",30),
+    "rocket":("🚀 Ракета",20)
 }
 
 # ---------------- STATES ----------------
@@ -170,10 +170,8 @@ async def check_promo(msg: Message, state: FSMContext):
     promo = cursor.fetchone()
 
     if not promo:
-        # Промокода нет
         await msg.answer("❌ Такого промокода нет")
     else:
-        # Код есть — сразу сообщаем, что использован
         await msg.answer("❌ Промокод использован")
 
     await state.clear()
@@ -184,8 +182,11 @@ async def check_promo(msg: Message, state: FSMContext):
 async def pre_checkout(pre_checkout_q: PreCheckoutQuery):
     await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
 
+# ---------------- PAYMENT RESULT ----------------
+
 @dp.message(F.successful_payment)
 async def payment_result(msg: Message):
+    # Всегда показываем ошибку после оплаты
     await msg.answer("❌ Ошибка при оплате попробуйте снова")
 
 # ---------------- ADMIN ----------------

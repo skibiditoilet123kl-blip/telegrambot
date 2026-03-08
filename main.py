@@ -1,13 +1,15 @@
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.router import Router
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 TOKEN = "8614684488:AAFlWlgEm6CcuVaq5kJe8te0PuYHV0Wead8"
-ADMIN_ID = 5349252067  # Ваш Telegram ID
+ADMIN_ID = 5349252067  # ваш ID в Telegram
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
+router = Router()
 
 # --- ДАННЫЕ ---
 gifts = {
@@ -25,8 +27,8 @@ gifts = {
 
 sales = []  # (отправитель, подарок, получатель, цена)
 promo_codes = {}  # {"PROMO": {"gift_key": str, "uses_left": int}}
-user_states = {}
-admin_states = {}
+user_states = {}  # состояния пользователей
+admin_states = {}  # состояния админа
 
 # --- КЛАВИАТУРЫ ---
 def start_keyboard():
@@ -53,18 +55,18 @@ def admin_keyboard():
     ])
 
 # --- СТАРТ ---
-@dp.message.register(Command("start"))
+@router.message(Command("start"))
 async def start_command(message: types.Message):
     await message.answer("Выберите действие:", reply_markup=start_keyboard())
 
-@dp.message.register(Command("admin"))
+@router.message(Command("admin"))
 async def admin_command(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     await message.answer("👑 Админ панель", reply_markup=admin_keyboard())
 
 # --- CALLBACK ---
-@dp.callback_query.register()
+@router.callback_query()
 async def callback_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     data = callback.data
@@ -125,7 +127,7 @@ async def callback_handler(callback: types.CallbackQuery):
         await callback.answer()
 
 # --- MESSAGE ---
-@dp.message.register()
+@router.message()
 async def message_handler(message: types.Message):
     user_id = message.from_user.id
     text = message.text.strip()
@@ -201,7 +203,10 @@ async def message_handler(message: types.Message):
             del admin_states[user_id]
             await message.answer(f"✅ Промокод {state['code']} для подарка {gifts[state['gift_key']]['name']} создан! Количество использований: {uses}")
 
-# --- RUN ---
+# --- РЕГИСТРАЦИЯ ---
+dp.include_router(router)
+
+# --- ЗАПУСК ---
 async def main():
     await dp.start_polling(bot)
 
